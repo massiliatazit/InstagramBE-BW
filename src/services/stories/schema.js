@@ -21,9 +21,16 @@ const StorySchema = new Schema(
     },
     duration: {
       type: Number,
-      min: 15,
-      max: 60,
+      min: 10,
+      max: 30,
     },
+    exclued: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Users",
+        required: true,
+      },
+    ],
   },
   { timestamps: true }
 );

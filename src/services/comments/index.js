@@ -1,14 +1,14 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const { authorize } = require("../auth/middleware");
 
 const Comment = require("./schema");
 const route = express.Router();
 
-route.post("/", async (req, res, next) => {
+route.post("/", authorize, async (req, res, next) => {
   try {
-    const newComment = new Comment(req.body);
+    const newComment = new Comment({ ...req.body, userID: req.user._id });
     await newComment.save();
-
     const { _id } = newComment;
     res.status(201).send(_id);
   } catch (error) {
@@ -17,20 +17,9 @@ route.post("/", async (req, res, next) => {
   }
 });
 
-route.get("/", async (req, res, next) => {
+route.get("/:post", async (req, res, next) => {
   try {
-    const newComment = await Comment.find();
-
-    res.status(201).send(newComment);
-  } catch (error) {
-    console.log(error);
-    next(error);
-  }
-});
-route.put("/", async (req, res, next) => {
-  try {
-    const newComment = await Comment.find();
-
+    const newComment = await Comment.find({ post: req.params.post });
     res.status(201).send(newComment);
   } catch (error) {
     console.log(error);
@@ -38,7 +27,22 @@ route.put("/", async (req, res, next) => {
   }
 });
 
-route.get("/:id", async (req, res, next) => {
+route.put("/:id", authorize, async (req, res, next) => {
+  try {
+    const updatedComment = await Comment.findOneAndUpdate({ _id: req.params._id, userID: req.user._id }, req.body, {
+      runValidators: true,
+      new: true,
+      useFindAndModify: false,
+    });
+    if (updatedComment) res.status(201).send(updatedComment);
+    else res.status(401).send("User not Authorized");
+  } catch (error) {
+    console.log(error);
+    next(error);
+  }
+});
+
+/* route.get("/:id", async (req, res, next) => {
   try {
     const sigleComment = await Comment.findById(req.params.id);
 
@@ -47,30 +51,25 @@ route.get("/:id", async (req, res, next) => {
     console.log(error);
     next(error);
   }
-});
+}); */
 
-route.put("/:id", async (req, res, next) => {
+/* route.put("/:id", async (req, res, next) => {
   try {
-    const modifiedComment = await Comment.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      {
-        runValidators: true,
-        new: true,
-        useFindAndModify: false,
-      }
-    );
+    const modifiedComment = await Comment.findByIdAndUpdate(req.params.id, req.body, {
+      runValidators: true,
+      new: true,
+      useFindAndModify: false,
+    });
 
     res.status(200).send(modifiedComment);
   } catch (error) {
     console.log(error);
   }
 });
-
-route.delete("/:id", async (req, res, next) => {
+ */
+route.delete("/:id", authorize, async (req, res, next) => {
   try {
-    const deletedComment = await Comment.findByIdAndDelete(req.params.id);
-
+    await Comment.findOneAndDelete({ _id: req.params.id, userID: req.user._id });
     res.status(200).send("DELETED");
   } catch (error) {
     console.log(error);

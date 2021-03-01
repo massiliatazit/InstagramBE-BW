@@ -4,17 +4,26 @@ const mongoose = require("mongoose");
 const CommentSchema = new Schema(
   {
     userID: {
-      type: String,
-      required: false,
+      type: Schema.Types.ObjectId,
+      ref: "Users",
+      required: true,
     },
     text: {
       type: String,
       required: true,
     },
-    like: {
-      type: [],
-      required: false,
+    post: {
+      type: Schema.Types.ObjectId,
+      ref: "Posts",
+      required: true,
     },
+    likes: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Users",
+        required: true,
+      },
+    ],
   },
   { timestamps: true }
 );

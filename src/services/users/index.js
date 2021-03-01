@@ -215,7 +215,9 @@ usersRouter.get("/:username", authorize, async (req, res, next) => {
       user.following = user.following.length;
       user.numPosts = user.posts.length;
       user.follow = req.user.following.includes(user._id);
-
+      /// filter the posts with the current user name in tag
+      const posts = [];
+      user.taged = posts;
       if (user.private) {
         if (user.follow) {
           res.send(user);

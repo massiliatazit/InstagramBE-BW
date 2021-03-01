@@ -1,15 +1,15 @@
 const express = require("express");
 const mongoose = require("mongoose");
 
-const Comment = require("./schema");
+const Story = require("./schema");
 const route = express.Router();
 
 route.post("/", async (req, res, next) => {
   try {
-    const newComment = new Comment(req.body);
-    await newComment.save();
+    const newStory = new Story(req.body);
+    await newStory.save();
 
-    const { _id } = newComment;
+    const { _id } = newStory;
     res.status(201).send(_id);
   } catch (error) {
     console.log(error);
@@ -19,9 +19,9 @@ route.post("/", async (req, res, next) => {
 
 route.get("/", async (req, res, next) => {
   try {
-    const newComment = await Comment.find();
+    const newStory = await Story.find();
 
-    res.status(201).send(newComment);
+    res.status(201).send(newStory);
   } catch (error) {
     console.log(error);
     next(error);
@@ -29,9 +29,9 @@ route.get("/", async (req, res, next) => {
 });
 route.put("/", async (req, res, next) => {
   try {
-    const newComment = await Comment.find();
+    const newStory = await Story.find();
 
-    res.status(201).send(newComment);
+    res.status(201).send(newStory);
   } catch (error) {
     console.log(error);
     next(error);
@@ -40,9 +40,9 @@ route.put("/", async (req, res, next) => {
 
 route.get("/:id", async (req, res, next) => {
   try {
-    const sigleComment = await Comment.findById(req.params.id);
+    const sigleStory = await Story.findById(req.params.id);
 
-    res.status(200).send(sigleComment);
+    res.status(200).send(sigleStory);
   } catch (error) {
     console.log(error);
     next(error);
@@ -51,7 +51,7 @@ route.get("/:id", async (req, res, next) => {
 
 route.put("/:id", async (req, res, next) => {
   try {
-    const modifiedComment = await Comment.findByIdAndUpdate(
+    const modifiedStory = await Story.findByIdAndUpdate(
       req.params.id,
       req.body,
       {
@@ -61,7 +61,7 @@ route.put("/:id", async (req, res, next) => {
       }
     );
 
-    res.status(200).send(modifiedComment);
+    res.status(200).send(modifiedStory);
   } catch (error) {
     console.log(error);
   }
@@ -69,7 +69,7 @@ route.put("/:id", async (req, res, next) => {
 
 route.delete("/:id", async (req, res, next) => {
   try {
-    const deletedComment = await Comment.findByIdAndDelete(req.params.id);
+    const deletedStory = await Story.findByIdAndDelete(req.params.id);
 
     res.status(200).send("DELETED");
   } catch (error) {

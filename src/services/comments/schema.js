@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 
 const CommentSchema = new Schema(
   {
-    UserID: {
+    userID: {
       type: String,
       required: false,
     },
@@ -13,7 +13,7 @@ const CommentSchema = new Schema(
     },
     like: {
       type: [],
-      required: true,
+      required: false,
     },
   },
   { timestamps: true }

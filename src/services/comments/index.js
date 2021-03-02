@@ -9,6 +9,7 @@ const q2m = require("query-to-mongo");
 
 route.post("/:post", authorize, async (req, res, next) => {
   try {
+    //when posting a comment get the post and add notification to the post owner
     const newComment = new Comment({ ...req.body, post: req.params.post, user: req.user._id });
     const { _id } = await newComment.save();
     const comment = await Comment.findById(_id).populate("user", "-password -refreshTokens -email -followers -following -saved -puts -tagged -posts");

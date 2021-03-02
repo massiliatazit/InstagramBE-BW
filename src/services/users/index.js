@@ -180,6 +180,9 @@ usersRouter.post("/me/follow/:username", authorize, async (req, res, next) => {
   try {
     if (req.user) {
       const user = await UserSchema.findOne({ username: req.params.username });
+
+      //if user is private we sent notification but we dont follow
+      // else we do normal
       if (user && req.user.username !== user.username) {
         const indexLoggedIn = req.user.following.findIndex((id) => id.toString() === user._id.toString());
         const indexUser = user.followers.findIndex((id) => id.toString() === req.user._id.toString());
@@ -248,16 +251,22 @@ usersRouter.get("/:username/followers", authorize, async (req, res, next) => {
   try {
     if (req.user) {
       const user = await UserSchema.findOne({ username: req.params.username }).populate("followers", "-password -refreshTokens -email -followers -following -saved -posts -tagged");
-      if (user.private) {
-        if (req.user.following.includes(user._id)) {
-          res.send(user.followers);
+      if (user) {
+        if (user.private) {
+          if (req.user.following.includes(user._id)) {
+            res.send(user.followers);
+          } else {
+            const error = new Error();
+            error.httpStatusCode = 401;
+            next(error);
+          }
         } else {
-          const error = new Error();
-          error.httpStatusCode = 401;
-          next(error);
+          res.send(user.followers);
         }
       } else {
-        res.send(user.followers);
+        const error = new Error("User not found");
+        error.httpStatusCode = 404;
+        next(error);
       }
     } else {
       const error = new Error();
@@ -273,16 +282,22 @@ usersRouter.get("/:username/following", authorize, async (req, res, next) => {
   try {
     if (req.user) {
       const user = await UserSchema.findOne({ username: req.params.username }).populate("following", "-password -refreshTokens -email -followers -following -saved -posts -tagged");
-      if (user.private) {
-        if (req.user.following.includes(user._id)) {
-          res.send(user.following);
+      if (user) {
+        if (user.private) {
+          if (req.user.following.includes(user._id)) {
+            res.send(user.following);
+          } else {
+            const error = new Error();
+            error.httpStatusCode = 401;
+            next(error);
+          }
         } else {
-          const error = new Error();
-          error.httpStatusCode = 401;
-          next(error);
+          res.send(user.following);
         }
       } else {
-        res.send(user.following);
+        const error = new Error("User not found");
+        error.httpStatusCode = 404;
+        next(error);
       }
     } else {
       const error = new Error();

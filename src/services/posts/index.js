@@ -24,6 +24,8 @@ postRouter.post("/", authorize, async (req, res, next) => {
     const savedPost = await newPost.save();
     if (req.body.tags.length > 0) {
       req.body.tags.forEach(async (userID) => {
+        //create notification for each user
+
         await UserSchema.findByIdAndUpdate(
           userID,
           {
@@ -144,6 +146,7 @@ postRouter.put("/:id", authorize, async function (req, res, next) {
                 useFindAndModify: false,
               }
             );
+        // when user is beeing tagged (user doesn't exists) create notification for each user
       });
     }
     res.send(updated);
@@ -163,6 +166,7 @@ postRouter.put("/:id/picture", authorize, cloudinaryMulter.single("image"), asyn
 postRouter.post("/:id/like", authorize, async (req, res, next) => {
   try {
     const post = await PostModel.findOne({ _id: req.params.id, likes: req.user._id });
+
     const modifiedPost = post
       ? await PostModel.findByIdAndUpdate(
           req.params.id,
@@ -184,6 +188,8 @@ postRouter.post("/:id/like", authorize, async (req, res, next) => {
             useFindAndModify: false,
           }
         );
+
+    //if post doesn't exists creating a notification for for the owner of the post
     res
       .status(201)
       .send(

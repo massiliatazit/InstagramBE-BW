@@ -3,9 +3,10 @@ const { Schema } = require("mongoose");
 
 const StorySchema = new Schema(
   {
-    userID: {
-      type: String,
-      required: false,
+    user: {
+      type: Schema.Types.ObjectId,
+      ref: "Users",
+      required: true,
     },
     text: {
       type: String,
@@ -24,7 +25,7 @@ const StorySchema = new Schema(
       min: 10,
       max: 30,
     },
-    exclued: [
+    exclude: [
       {
         type: Schema.Types.ObjectId,
         ref: "Users",

@@ -10,25 +10,21 @@ const { authenticate, refreshToken } = require("../auth/tools");
 
 const passport = require("passport");
 
+const q2m = require("query-to-mongo");
+
 const cloudinary = require("cloudinary").v2;
 
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
 const multer = require("multer");
 
-const q2m = require("query-to-mongo");
-
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: "Instagram",
     format: async (req, file) => "png" || "jpg",
-    public_id: (req, file) => req.username + "_profile",
-    width: 300,
-    height: 300,
-    effect: "improve",
-    gravity: "face",
-    crop: "fit",
+    public_id: (req, file) => req.user.username + "_profile",
+    transformation: [{ width: 400, height: 400, gravity: "face", crop: "fill" }],
   },
 });
 
@@ -64,11 +60,11 @@ usersRouter.post("/register", async (req, res, next) => {
 
 usersRouter.post("/login", async (req, res, next) => {
   try {
-    const { email, password } = req.body;
-    const user = await UserSchema.findByCredentials(email, password);
+    const { email, password, username } = req.body;
+    const user = await UserSchema.findByCredentials(email, password, username);
     if (user) {
-      /*       const tokens = await authenticate(user);
-      res.cookie("token", tokens.token, {
+      const tokens = await authenticate(user);
+      /*res.cookie("token", tokens.token, {
         httpOnly: true,
       });
       res.cookie("refreshToken", tokens.refreshToken, {
@@ -119,7 +115,7 @@ usersRouter.post("/logOutAll", authorize, async (req, res, next) => {
   }
 });
 usersRouter.post("/refreshToken", async (req, res, next) => {
-  const oldRefreshToken = req.cookies.refreshToken;
+  const oldRefreshToken = req.body.refreshToken;
   if (!oldRefreshToken) {
     const err = new Error("Refresh token missing");
     err.httpStatusCode = 400;
@@ -150,6 +146,7 @@ usersRouter.post("/refreshToken", async (req, res, next) => {
 usersRouter.get("/", async (req, res, next) => {
   try {
     const users = await UserSchema.find(req.query.search && { $text: { $search: req.query.search } })
+      .select("-password -refreshTokens -email -followers -following -saved -posts -tagged")
       .sort({ createdAt: -1 })
       .skip(req.query.page && (req.query.page - 1) * 10)
       .limit(10);
@@ -162,71 +159,42 @@ usersRouter.get("/", async (req, res, next) => {
 usersRouter.get("/me", authorize, async (req, res, next) => {
   try {
     if (req.user) {
-      const user = await UserSchema.findById(req.user._id).populate("posts");
-      user.followers = user.followers.length;
-      user.following = user.following.length;
-      user.numPosts = user.posts.length;
-      res.send(user);
+      req.user.populate("posts");
+      const followers = req.user.followers.length;
+      const following = req.user.following.length;
+      const numPosts = req.user.posts.length;
+      res.send({ user: req.user, followers, following, numPosts });
     } else {
       const error = new Error();
       error.httpStatusCode = 404;
       next(error);
     }
   } catch (error) {
-    console.log(error);
-    next("While reading users list a problem occurred!");
+    next(error);
   }
 });
 usersRouter.post("/me/follow/:username", authorize, async (req, res, next) => {
   try {
     if (req.user) {
-      const user = await UserSchema.findOne({ username: req.params.username }).populate("posts");
-      const indexLoggedIn = req.user.following.findindex((id) => id === user._id);
-      const idexUser = user.followers.findindex((id) => id === user._id);
-      if (indexLoggedIn !== -1) {
-        req.user.following = [...req.user.following.splice(0, indexLoggedIn), ...req.user.following.splice(indexLoggedIn + 1)];
-        user.followers.followers = [...user.followers.splice(0, idexUser), ...user.followers.splice(idexUser + 1)];
-      } else {
-        req.user.following.concat(user._id);
-        user.followers.concat(req.user._id);
-      }
-      req.user.save();
-      user.save();
-      user.followers = user.followers.length;
-      user.following = user.following.length;
-      user.numPosts = user.posts.length;
-      res.status(201).send(user);
-    } else {
-      const error = new Error();
-      error.httpStatusCode = 404;
-      next(error);
-    }
-  } catch (error) {
-    console.log(error);
-    next("While reading users list a problem occurred!");
-  }
-});
-
-usersRouter.get("/:username", authorize, async (req, res, next) => {
-  try {
-    if (req.user) {
-      const user = await UserSchema.findOne({ username: req.params.username }).populate("posts");
-      user.followers = user.followers.length;
-      user.following = user.following.length;
-      user.numPosts = user.posts.length;
-      user.follow = req.user.following.includes(user._id);
-      /// filter the posts with the current user name in tag
-      const posts = [];
-      user.taged = posts;
-      if (user.private) {
-        if (user.follow) {
-          res.send(user);
+      const user = await UserSchema.findOne({ username: req.params.username });
+      if (user && req.user.username !== user.username) {
+        const indexLoggedIn = req.user.following.findIndex((id) => id.toString() === user._id.toString());
+        const indexUser = user.followers.findIndex((id) => id.toString() === req.user._id.toString());
+        if (indexLoggedIn !== -1 && indexUser !== -1) {
+          req.user.following = [...req.user.following.slice(0, indexLoggedIn), ...req.user.following.slice(indexLoggedIn + 1)];
+          user.followers = [...user.followers.slice(0, indexUser), ...user.followers.slice(indexUser + 1)];
         } else {
-          user.posts = [];
-          res.send(user);
+          req.user.following = [...req.user.following, user._id];
+          user.followers = [...user.followers, req.user._id];
         }
+        await req.user.save();
+        await user.save();
+        const updatedUser = await UserSchema.findByUserName(user.username);
+        res.status(201).send(updatedUser);
       } else {
-        res.send(user);
+        const error = new Error("User not found");
+        error.httpStatusCode = 404;
+        next(error);
       }
     } else {
       const error = new Error();
@@ -234,14 +202,46 @@ usersRouter.get("/:username", authorize, async (req, res, next) => {
       next(error);
     }
   } catch (error) {
-    console.log(error);
-    next("While reading users list a problem occurred!");
+    next(error);
   }
 });
+
+usersRouter.get("/:username", authorize, async (req, res, next) => {
+  try {
+    if (req.user) {
+      const user = await UserSchema.findByUserName(req.params.username);
+      if (user) {
+        const follow = req.user.following.includes(user._id);
+        if (user.private) {
+          if (follow) {
+            res.send(user);
+          } else {
+            delete user.posts;
+            delete user.tagged;
+            res.send({ ...user });
+          }
+        } else {
+          res.send(user);
+        }
+      } else {
+        const error = new Error("User not found");
+        error.httpStatusCode = 404;
+        next(error);
+      }
+    } else {
+      const error = new Error();
+      error.httpStatusCode = 401;
+      next(error);
+    }
+  } catch (error) {
+    next(error);
+  }
+});
+
 usersRouter.get("/:username/followers", authorize, async (req, res, next) => {
   try {
     if (req.user) {
-      const user = await UserSchema.findOne({ username: req.params.username }).populate("followers");
+      const user = await UserSchema.findOne({ username: req.params.username }).populate("followers", "-password -refreshTokens -email -followers -following -saved -posts -tagged");
       if (user.private) {
         if (req.user.following.includes(user._id)) {
           res.send(user.followers);
@@ -259,15 +259,14 @@ usersRouter.get("/:username/followers", authorize, async (req, res, next) => {
       next(error);
     }
   } catch (error) {
-    console.log(error);
-    next("While reading users list a problem occurred!");
+    next(error);
   }
 });
 
 usersRouter.get("/:username/following", authorize, async (req, res, next) => {
   try {
     if (req.user) {
-      const user = await UserSchema.findOne({ username: req.params.username }).populate("following");
+      const user = await UserSchema.findOne({ username: req.params.username }).populate("following", "-password -refreshTokens -email -followers -following -saved -posts -tagged");
       if (user.private) {
         if (req.user.following.includes(user._id)) {
           res.send(user.following);
@@ -285,15 +284,14 @@ usersRouter.get("/:username/following", authorize, async (req, res, next) => {
       next(error);
     }
   } catch (error) {
-    console.log(error);
-    next("While reading users list a problem occurred!");
+    next(error);
   }
 });
 
 usersRouter.put("/me", authorize, async (req, res, next) => {
   try {
     if (req.user) {
-      const updates = Object.keys(req.body);
+      const updates = Object.keys(req.body).filter((key) => key !== "password");
       updates.forEach((update) => (req.user[update] = req.body[update]));
       await req.user.save();
       res.send(req.user);
@@ -306,7 +304,20 @@ usersRouter.put("/me", authorize, async (req, res, next) => {
     next(error);
   }
 });
-
+usersRouter.put("/me/changePassword", authorize, async (req, res, next) => {
+  try {
+    if (req.user) {
+      const user = await UserSchema.changePassword(req.user._id, req.body.oldPassword, req.body.newPassword);
+      user ? res.status(201).send("Password changed") : res.status(401).send("Incorrect password Provided");
+    } else {
+      const error = new Error(`user with id ${req.params.id} not found`);
+      error.httpStatusCode = 404;
+      next(error);
+    }
+  } catch (error) {
+    next(error);
+  }
+});
 usersRouter.put("/me/profileImage", authorize, parser.single("image"), async (req, res, next) => {
   try {
     if (req.user) {

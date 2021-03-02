@@ -5,6 +5,8 @@ const { authorize } = require("../auth/middleware");
 const Comment = require("./schema");
 const route = express.Router();
 
+const q2m = require("query-to-mongo");
+
 route.post("/:post", authorize, async (req, res, next) => {
   try {
     const newComment = new Comment({ ...req.body, post: req.params.post, user: req.user._id });

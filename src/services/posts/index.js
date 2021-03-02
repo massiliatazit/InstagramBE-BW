@@ -1,9 +1,13 @@
 const express = require("express");
 const PostModel = require("./schema");
+const UserSchema = require("./schema");
 const postRouter = express.Router();
 const multer = require("multer");
 const cloudinary = require("../../cloudinary");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
+
+const q2m = require("query-to-mongo");
+
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
@@ -18,6 +22,20 @@ postRouter.post("/", authorize, async (req, res, next) => {
   try {
     const newPost = new PostModel({ ...req.body, user: req.user._id });
     const savedPost = await newPost.save();
+    if (req.body.tags.length > 0) {
+      req.body.tags.forEach(async (userID) => {
+        await UserSchema.findByIdAndUpdate(
+          userID,
+          {
+            $push: { tagged: sevedPost._id },
+          },
+          {
+            new: true,
+            useFindAndModify: false,
+          }
+        );
+      });
+    }
     res.status(201).send({ post: savedPost.populate("user", "-password -refreshTokens -email -followers -following -saved -puts -tagged -posts"), ok: true });
   } catch (error) {
     res.send("Something is going wrong");
@@ -28,16 +46,20 @@ postRouter.post("/", authorize, async (req, res, next) => {
 postRouter.get("/home", authorize, async (req, res, next) => {
   try {
     const following = req.user.following;
-    const query = following.map((followed_user) => {
+    const follow = following.map((followed_user) => {
       return { user: followed_user };
     });
-    const allPosts = await PostModel.find({ $or: [...query, { user: req.user._id }] })
+    const query = q2m(req.query);
+    const total = await PostModel.countDocuments({ $or: [...follow, { user: req.user._id }] });
+    const allPosts = await PostModel.find({ $or: [...follow, { user: req.user._id }] })
       .sort({ createdAt: -1 })
+      .skip(query.options.skip)
+      .limit(query.options.limit)
       .populate("comments.user", "-password -refreshTokens -email -followers -following -saved -puts -tagged -posts")
       .populate("tags", "-password -refreshTokens -email -followers -following -saved -puts -tagged -posts")
       .populate("user", "-password -refreshTokens -email -followers -following -saved -puts -tagged -posts");
-
-    res.status(200).send(allPosts);
+    const links = query.links("/posts/home", total);
+    res.status(200).send({ posts: allPosts, total, links });
   } catch (error) {
     next(error);
   }
@@ -45,15 +67,20 @@ postRouter.get("/home", authorize, async (req, res, next) => {
 postRouter.get("/explore", authorize, async (req, res, next) => {
   try {
     const following = req.user.following;
-    const query = following.map((followed_user) => {
+    const follow = following.map((followed_user) => {
       return { user: { $ne: followed_user } };
     });
-    const allPosts = await PostModel.find({ $and: [...query, { user: { $ne: req.user._id } }] })
+    const query = q2m(req.query);
+    const total = await PostModel.countDocuments({ $and: [...follow, { user: { $ne: req.user._id } }] });
+    const allPosts = await PostModel.find({ $and: [...follow, { user: { $ne: req.user._id } }] })
       .sort({ createdAt: -1 })
+      .skip(query.options.skip)
+      .limit(query.options.limit)
       .populate("comments.user", "-password -refreshTokens -email -followers -following -saved -puts -tagged -posts")
       .populate("tags", "-password -refreshTokens -email -followers -following -saved -puts -tagged -posts")
       .populate("user", "-password -refreshTokens -email -followers -following -saved -puts -tagged -posts");
-    res.status(200).send(allPosts);
+    const links = query.links("/posts/explore", total);
+    res.status(200).send({ posts: allPosts, total, links });
   } catch (error) {
     next(error);
   }
@@ -92,6 +119,33 @@ postRouter.delete("/:id", authorize, async function (req, res, next) {
 postRouter.put("/:id", authorize, async function (req, res, next) {
   try {
     const updated = await PostModel.findOneAndUpdate({ _id: req.params.id, user: req.user }, req.body);
+
+    if (req.body.tags.length > 0) {
+      req.body.tags.forEach(async (userID) => {
+        const user = await UserSchema.findOne({ _id: userID, tagged: req.params.id });
+        user
+          ? await UserSchema.findByIdAndUpdate(
+              userID,
+              {
+                $pull: { tagged: sevedPost._id },
+              },
+              {
+                new: true,
+                useFindAndModify: false,
+              }
+            )
+          : await UserSchema.findByIdAndUpdate(
+              userID,
+              {
+                $push: { tagged: sevedPost._id },
+              },
+              {
+                new: true,
+                useFindAndModify: false,
+              }
+            );
+      });
+    }
     res.send(updated);
   } catch (error) {
     next(error);

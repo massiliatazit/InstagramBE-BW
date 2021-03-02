@@ -17,6 +17,9 @@ const UserSchema = new Schema(
       unique: true,
       required: true,
     },
+    bio: {
+      type: String,
+    },
     email: {
       type: String,
       required: true,
@@ -54,7 +57,7 @@ UserSchema.methods.toJSON = function () {
   delete userObject.__v;
   return userObject;
 };
-
+UserSchema.index({ username: "text", name: "text", bio: "text", surname: "text" });
 UserSchema.statics.findByCredentials = async function (email, password, username) {
   const user = await this.findOne({ $or: [{ email }, { username }] });
   if (user) {

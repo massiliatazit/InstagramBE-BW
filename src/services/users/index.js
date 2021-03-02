@@ -145,12 +145,15 @@ usersRouter.post("/refreshToken", async (req, res, next) => {
 
 usersRouter.get("/", async (req, res, next) => {
   try {
+    const query = q2m(req.query);
+    const total = await UserSchema.countDocuments(req.query.search && { $text: { $search: req.query.search } });
     const users = await UserSchema.find(req.query.search && { $text: { $search: req.query.search } })
-      .select("-password -refreshTokens -email -followers -following -saved -posts -tagged")
       .sort({ createdAt: -1 })
-      .skip(req.query.page && (req.query.page - 1) * 10)
-      .limit(10);
-    res.send(users);
+      .skip(query.options.skip)
+      .limit(query.options.limit)
+      .select("-password -refreshTokens -email -followers -following -saved -posts -tagged");
+    const links = query.links("/users", total);
+    res.send({ users, links, total });
   } catch (error) {
     next(error);
   }
@@ -159,7 +162,7 @@ usersRouter.get("/", async (req, res, next) => {
 usersRouter.get("/me", authorize, async (req, res, next) => {
   try {
     if (req.user) {
-      req.user.populate("posts");
+      req.user.populate("posts", "tagged");
       const followers = req.user.followers.length;
       const following = req.user.following.length;
       const numPosts = req.user.posts.length;
@@ -209,7 +212,10 @@ usersRouter.post("/me/follow/:username", authorize, async (req, res, next) => {
 usersRouter.get("/:username", authorize, async (req, res, next) => {
   try {
     if (req.user) {
-      const user = await UserSchema.findByUserName(req.params.username);
+      const user = await UserSchema.findByUserName(req.params.username)
+        .populate("posts", "tagged")
+        .populate("posts.user", "-password -refreshTokens -email -followers -following -saved -posts -tagged")
+        .populate("tagged.user", "-password -refreshTokens -email -followers -following -saved -posts -tagged");
       if (user) {
         const follow = req.user.following.includes(user._id);
         if (user.private) {

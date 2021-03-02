@@ -1,51 +1,38 @@
 const RoomModel = require("../services/rooms/schema");
-const addUserToRoom = async ({ sender, receiver, socketId, room }) => {
+const addUserToRoom = async ({ username, socketId, room }) => {
   try {
-    const roomName = room ? room : await createRoom(sender, receiver);
+    const room1="room1"
+    const roomName = room ? room : await createRoom(room1);
     const user = await RoomModel.findOne({
       name: roomName,
-      "members.username": sender,
+      "members.username": username,
     });
-    const user1 = await RoomModel.findOne({
-      name: roomName,
-      "members.username": receiver,
-    });
+   
     if (user) {
       // if user is in room update socketId
       await RoomModel.findOneAndUpdate(
-        { name: roomName, "members.username": sender },
+        { name: roomName, "members.username": username },
         { "members.$.socketId": socketId } // replace prev Id with the new socketId
       );
     } else {
       // if doesn't exist add it to members
       await RoomModel.findOneAndUpdate(
         { name: roomName },
-        { $addToSet: { members: { username: sender, socketId } } }
+        { $addToSet: { members: { username, socketId } } }
       );
     }
-    if (user1) {
-      // if user is in room update socketId
-      await RoomModel.findOneAndUpdate(
-        { name: roomName, "members.username": receiver },
-        { "members.$.socketId": socketId } // replace prev Id with the new socketId
-      );
-    } else {
-      // if doesn't exist add it to members
-       await RoomModel.findOneAndUpdate(
-        { name: roomName },
-        { $addToSet: { members: { username: receiver, socketId } } }
-      );
-    }
-    return { receiver, roomName };
+    
+    return { username, roomName };
   } catch (error) {
     console.log(error);
   }
 };
 
 // on join if room exist ? joın : create
-const createRoom = async (sender, receiver) => {
+const createRoom = async (roomName) => {
   try {
-    const newRoom = await new RoomModel({ name: sender + receiver });
+    
+    const newRoom = await new RoomModel({ name: roomName });
 
     const savedRoom = await newRoom.save();
     if (savedRoom._id) return savedRoom.name;

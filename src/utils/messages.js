@@ -1,4 +1,4 @@
-const MessageModel = require("../services/messages/schema")
+const MessageModel = require("../services/messages/shema")
 
 const addMessage = async (sender, room, message) => {
   try {

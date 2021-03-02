@@ -62,8 +62,33 @@ const getUsersInRoom = async (roomName) => {
     console.log(error);
   }
 };
+const getUserBySocket = async (roomName, socketId) => {
+  try {
+    const room = await RoomModel.findOne({ name: roomName })
+  
+    const user = room.members.find(user => user.socketId === socketId)
+    return user
+  } catch (error) {
+    console.log(error)
+  }
+}
+const removeUserFromRoom = async (socketId, roomName) => {
+  try {
+    const room = await RoomModel.findOne({ name: roomName })
 
+    const username = room.members.find(member => member.socketId === socketId)
+
+    await RoomModel.findOneAndUpdate(
+      { name: roomName },
+      { $pull: { members: { socketId } } }
+    )
+
+    return username
+  } catch (error) {}
+}
 module.exports = {
   addUserToRoom,
   getUsersInRoom,
+  getUserBySocket,
+  removeUserFromRoom
 };

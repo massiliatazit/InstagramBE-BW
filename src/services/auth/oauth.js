@@ -35,7 +35,6 @@ passport.use(
           next(null, { user: savedUser, tokens });
         }
       } catch (error) {
-        console.log(error);
         next(error);
       }
     }

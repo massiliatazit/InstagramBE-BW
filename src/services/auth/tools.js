@@ -11,14 +11,13 @@ const authenticate = async (user) => {
 
     return { token: newAccessToken, refreshToken: newRefreshToken };
   } catch (error) {
-    console.log(error);
     throw new Error(error);
   }
 };
 
 const generateJWT = (payload) =>
   new Promise((res, rej) =>
-    jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "15m" }, (err, token) => {
+    jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "1 week" }, (err, token) => {
       if (err) rej(err);
       res(token);
     })

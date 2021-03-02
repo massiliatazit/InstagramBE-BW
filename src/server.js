@@ -3,6 +3,8 @@ const cors = require("cors");
 const { join } = require("path");
 const listEndpoints = require("express-list-endpoints");
 const mongoose = require("mongoose");
+const http = require ('http')
+const createSocketServer = require('./socket')
 
 const servicesRouter = require("./services");
 
@@ -15,6 +17,8 @@ const oauth = require("./services/auth/oauth");
 const cookieParser = require("cookie-parser");
 
 const server = express();
+const httpServer = http.createServer(server)
+createSocketServer(httpServer)
 
 const port = process.env.PORT || 3001;
 
@@ -59,7 +63,7 @@ mongoose
     useUnifiedTopology: true,
   })
   .then(
-    server.listen(port, () => {
+    httpServer.listen(port, () => {
       console.log("Running on port", port);
     })
   )

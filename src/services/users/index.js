@@ -209,28 +209,28 @@ usersRouter.post("/me/follow/:username", authorize, async (req, res, next) => {
       const user = await UserSchema.findOne({ username: req.params.username });
 
       if (user && req.user.username !== user.username) {
-        if (!user.private) {
-          const indexLoggedIn = req.user.following.findIndex((id) => id.toString() === user._id.toString());
-          const indexUser = user.followers.findIndex((id) => id.toString() === req.user._id.toString());
-          if (indexLoggedIn !== -1 && indexUser !== -1) {
-            req.user.following = [...req.user.following.slice(0, indexLoggedIn), ...req.user.following.slice(indexLoggedIn + 1)];
-            user.followers = [...user.followers.slice(0, indexUser), ...user.followers.slice(indexUser + 1)];
-          } else {
+        const indexLoggedIn = req.user.following.findIndex((id) => id.toString() === user._id.toString());
+        const indexUser = user.followers.findIndex((id) => id.toString() === req.user._id.toString());
+        if (indexLoggedIn !== -1 && indexUser !== -1) {
+          req.user.following = [...req.user.following.slice(0, indexLoggedIn), ...req.user.following.slice(indexLoggedIn + 1)];
+          user.followers = [...user.followers.slice(0, indexUser), ...user.followers.slice(indexUser + 1)];
+        } else {
+          if (!user.private) {
             req.user.following = [...req.user.following, user._id];
             user.followers = [...user.followers, req.user._id];
+          } else {
+            //if user is private we sent notification but we dont follow
+            const notification = new Notification({ from: req.user._id, to: user._id, action: "asked to follow you" });
+            await notification.save();
+            res.send(201).send(req.user);
           }
-          await req.user.save();
-          await user.save();
-          const updatedUser = await UserSchema.findByUserName(user.username);
-          const notification = new Notification({ from: req.user._id, to: user._id, action: "started following you" });
-          await notification.save();
-          res.status(201).send(updatedUser);
-        } else {
-          //if user is private we sent notification but we dont follow
-          const notification = new Notification({ from: req.user._id, to: user._id, action: "asked to follow you" });
-          await notification.save();
-          res.send(201).send(req.user);
         }
+        await req.user.save();
+        await user.save();
+        const updatedUser = await UserSchema.findByUserName(user.username);
+        const notification = new Notification({ from: req.user._id, to: user._id, action: "started following you" });
+        await notification.save();
+        res.status(201).send(updatedUser);
       } else {
         const error = new Error("User not found");
         error.httpStatusCode = 404;
@@ -287,7 +287,7 @@ usersRouter.get("/:username/followers", authorize, async (req, res, next) => {
       const user = await UserSchema.findOne({ username: req.params.username }).populate("followers", "-password -refreshTokens -email -followers -following -saved -posts -tagged");
       if (user) {
         if (user.private) {
-          if (req.user.following.includes(user._id)) {
+          if (req.user.following.includes(user._id) || user._id === req.user._id) {
             res.send(user.followers);
           } else {
             const error = new Error();
@@ -318,7 +318,7 @@ usersRouter.get("/:username/following", authorize, async (req, res, next) => {
       const user = await UserSchema.findOne({ username: req.params.username }).populate("following", "-password -refreshTokens -email -followers -following -saved -posts -tagged");
       if (user) {
         if (user.private) {
-          if (req.user.following.includes(user._id)) {
+          if (req.user.following.includes(user._id) || user.username === req.user.username) {
             res.send(user.following);
           } else {
             const error = new Error();

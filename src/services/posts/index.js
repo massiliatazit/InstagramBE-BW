@@ -162,7 +162,10 @@ postRouter.put("/:id", authorize, async function (req, res, next) {
 });
 postRouter.put("/:id/picture", authorize, cloudinaryMulter.single("image"), async (req, res, next) => {
   try {
-    const updatedPost = await PostModel.findOneAndUpdate({ _id: req.params.id, user: req.user._id }, { image: req.file.path }, { runValidators: true, new: true }).populate("user", "comments");
+    const updatedPost = await PostModel.findOneAndUpdate({ _id: req.params.id, user: req.user._id }, { image: req.file.path }, { runValidators: true, new: true })
+      .populate("comments.user", "-password -refreshTokens -email -followers -following -saved -puts -tagged -posts")
+      .populate("tags", "-password -refreshTokens -email -followers -following -saved -puts -tagged -posts")
+      .populate("user", "-password -refreshTokens -email -followers -following -saved -puts -tagged -posts");
     res.send(updatedPost);
   } catch (error) {
     next(error);

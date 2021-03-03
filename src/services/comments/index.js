@@ -2,6 +2,8 @@ const express = require("express");
 const mongoose = require("mongoose");
 const { authorize } = require("../auth/middleware");
 
+const Notification = require("../notifications/schema");
+
 const Comment = require("./schema");
 const route = express.Router();
 
@@ -12,7 +14,9 @@ route.post("/:post", authorize, async (req, res, next) => {
     //when posting a comment get the post and add notification to the post owner
     const newComment = new Comment({ ...req.body, post: req.params.post, user: req.user._id });
     const { _id } = await newComment.save();
-    const comment = await Comment.findById(_id).populate("user", "-password -refreshTokens -email -followers -following -saved -puts -tagged -posts");
+    const comment = await Comment.findById(_id).populate("user", "-password -refreshTokens -email -followers -following -saved -puts -tagged -posts").populate("post");
+    const notification = new Notification({ from: req.user._id, to: comment.post.user, post: req.params.post, action: "left a comment" });
+    await notification.save();
     res.status(201).send(comment);
   } catch (error) {
     next(error);

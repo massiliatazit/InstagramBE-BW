@@ -5,6 +5,7 @@ const postRouter = express.Router();
 const multer = require("multer");
 const cloudinary = require("../../cloudinary");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const Notification = require("../notifications/schema");
 
 const q2m = require("query-to-mongo");
 
@@ -23,9 +24,11 @@ postRouter.post("/", authorize, async (req, res, next) => {
     const newPost = new PostModel({ ...req.body, user: req.user._id });
     const savedPost = await newPost.save();
     if (req.body.tags.length > 0) {
+      let notification;
       req.body.tags.forEach(async (userID) => {
         //create notification for each user
-
+        notification = new Notification({ from: req.user._id, to: userID, post: savedPost._id, action: "tagged you" });
+        await notification.save();
         await UserSchema.findByIdAndUpdate(
           userID,
           {
@@ -122,7 +125,7 @@ postRouter.put("/:id", authorize, async function (req, res, next) {
   try {
     const updated = await PostModel.findOneAndUpdate({ _id: req.params.id, user: req.user }, req.body);
 
-    if (req.body.tags.length > 0) {
+    if (req.body.tags.length > 0 && updated) {
       req.body.tags.forEach(async (userID) => {
         const user = await UserSchema.findOne({ _id: userID, tagged: req.params.id });
         user
@@ -146,7 +149,10 @@ postRouter.put("/:id", authorize, async function (req, res, next) {
                 useFindAndModify: false,
               }
             );
-        // when user is beeing tagged (user doesn't exists) create notification for each user
+        if (!user) {
+          notification = new Notification({ from: req.user._id, to: userID, post: updated._id, action: "tagged you" });
+          await notification.save();
+        }
       });
     }
     res.send(updated);
@@ -189,7 +195,10 @@ postRouter.post("/:id/like", authorize, async (req, res, next) => {
           }
         );
 
-    //if post doesn't exists creating a notification for for the owner of the post
+    if (!post && modifiedPost) {
+      notification = new Notification({ from: req.user._id, to: modifiedPost.user._id, post: req.params._id, action: "liked your post" });
+      await notification.save();
+    }
     res
       .status(201)
       .send(

@@ -160,7 +160,26 @@ usersRouter.get("/", async (req, res, next) => {
     next(error);
   }
 });
+usersRouter.get("/suggested", authorize, async (req, res, next) => {
+  try {
+    const query = q2m(req.query);
+    const follow = following.map((followed_user) => {
+      return { _id: { $ne: followed_user } };
+    });
+    const total = await UserSchema.countDocuments({ $and: [...follow, { _id: { $ne: req.user._id } }] });
 
+    const users = await UserSchema.find({ $and: [...follow, { _id: { $ne: req.user._id } }] })
+      .sort({ createdAt: -1 })
+      .skip(query.options.skip)
+      .limit(query.options.limit)
+      .select("-password -refreshTokens -email -followers -following -saved -posts -tagged");
+
+    const links = query.links("/users", total);
+    res.send({ users, links, total });
+  } catch (error) {
+    next(error);
+  }
+});
 usersRouter.get("/me", authorize, async (req, res, next) => {
   try {
     if (req.user) {

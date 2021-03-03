@@ -163,7 +163,7 @@ usersRouter.get("/", async (req, res, next) => {
 usersRouter.get("/suggested", authorize, async (req, res, next) => {
   try {
     const query = q2m(req.query);
-    const follow = following.map((followed_user) => {
+    const follow = req.user.following.map((followed_user) => {
       return { _id: { $ne: followed_user } };
     });
     const total = await UserSchema.countDocuments({ $and: [...follow, { _id: { $ne: req.user._id } }] });
@@ -184,10 +184,16 @@ usersRouter.get("/me", authorize, async (req, res, next) => {
   try {
     if (req.user) {
       req.user.populate("posts", "tagged");
+      const userObject = req.user.toObject();
       const followers = req.user.followers.length;
       const following = req.user.following.length;
       const numPosts = req.user.posts.length;
-      res.send({ user: req.user, followers, following, numPosts });
+
+      delete userObject.refreshTokens;
+      delete userObject.followers;
+      delete userObject.following;
+
+      res.send({ user: userObject, followers, following, numPosts });
     } else {
       const error = new Error();
       error.httpStatusCode = 404;
@@ -218,7 +224,6 @@ usersRouter.post("/me/follow/:username", authorize, async (req, res, next) => {
           const updatedUser = await UserSchema.findByUserName(user.username);
           const notification = new Notification({ from: req.user._id, to: user._id, action: "started following you" });
           await notification.save();
-          res.send(201).send(req.user);
           res.status(201).send(updatedUser);
         } else {
           //if user is private we sent notification but we dont follow

@@ -24,6 +24,7 @@ const StorySchema = new Schema(
       type: Number,
       min: 10,
       max: 30,
+      default: 10,
     },
     exclude: [
       {

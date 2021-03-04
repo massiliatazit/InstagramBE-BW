@@ -46,7 +46,7 @@ usersRouter.get("/facebookRedirect", passport.authenticate("facebook"), async (r
       path: "/users/refreshToken",
     });
  */
-    res.status(200).redirect(`${process.env.FE_URL}/profile?token=${req.user.tokens.token}&refreshToken=${req.user.tokens.refreshToken}`);
+    res.status(200).redirect(`${process.env.FE_URL}/profile/me?token=${req.user.tokens.token}&refreshToken=${req.user.tokens.refreshToken}`);
   } catch (error) {
     next(error);
   }
@@ -247,18 +247,18 @@ usersRouter.post("/me/follow/:username", authorize, async (req, res, next) => {
           if (!user.private) {
             req.user.following = [...req.user.following, user._id];
             user.followers = [...user.followers, req.user._id];
+            await req.user.save();
+            await user.save();
+            const notification = new Notification({ from: req.user._id, to: user._id, action: "started following you" });
+            await notification.save();
+            res.status(201).send({ ok: true });
           } else {
             //if user is private we sent notification but we dont follow
             const notification = new Notification({ from: req.user._id, to: user._id, action: "asked to follow you" });
             await notification.save();
-            res.send(201).send({ ok: true, message: "Follow Requested" });
+            res.status(201).send({ ok: true, message: "Follow Requested" });
           }
         }
-        await req.user.save();
-        await user.save();
-        const notification = new Notification({ from: req.user._id, to: user._id, action: "started following you" });
-        await notification.save();
-        res.status(201).send({ ok: true });
       } else {
         const error = new Error("User not found");
         error.httpStatusCode = 404;
@@ -270,6 +270,7 @@ usersRouter.post("/me/follow/:username", authorize, async (req, res, next) => {
       next(error);
     }
   } catch (error) {
+    console.log(error);
     next(error);
   }
 });

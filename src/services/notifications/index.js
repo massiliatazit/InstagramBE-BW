@@ -37,6 +37,7 @@ route.post("/approveFollow/:id", authorize, async (req, res, next) => {
       );
       if (from) {
         req.user.followers = [...req.user.followers, from._id];
+        await req.user.save();
         const newNotification = new Notification({ from: req.user._id, to: from._id, action: "accepted your follow request" });
         await newNotification.save();
         res.status(201).send({ ok: true });

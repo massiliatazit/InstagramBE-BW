@@ -1,5 +1,7 @@
 const socketio = require('socket.io')
+
 const {addUserToRoom,getUsersInRoom,removeUserFromRoom,getUserBySocket} = require("./utils/users")
+const addMessage = require("./utils/messages")
 const createSocketServer = server => {// create to server
     const io = socketio(server)
     io.on("connection", socket =>{ // connect to server
@@ -13,7 +15,7 @@ const createSocketServer = server => {// create to server
                 ...data,
                 
               })
-      
+     
               socket.join(room)
       
               const messageToRoomMembers = {
@@ -37,7 +39,7 @@ const createSocketServer = server => {// create to server
       
             // search in the room for that user (search by socket.id)
             const user = await getUserBySocket(room, socket.id)
-      
+                   console.log(socket.id)
             const messageContent = {
               text: message,
               sender: user.username,

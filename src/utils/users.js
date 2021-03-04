@@ -1,8 +1,8 @@
 const RoomModel = require("../services/rooms/schema");
 const addUserToRoom = async ({ username, socketId, room }) => {
   try {
-    const room1="room1"
-    const roomName = room ? room : await createRoom(room1);
+   
+    const roomName =await createRoom(room);
     const user = await RoomModel.findOne({
       name: roomName,
       "members.username": username,
@@ -22,7 +22,7 @@ const addUserToRoom = async ({ username, socketId, room }) => {
       );
     }
     
-    return { username, roomName };
+    return { username, room:roomName };
   } catch (error) {
     console.log(error);
   }
@@ -31,17 +31,23 @@ const addUserToRoom = async ({ username, socketId, room }) => {
 // on join if room exist ? joın : create
 const createRoom = async (roomName) => {
   try {
-    
-    const newRoom = await new RoomModel({ name: roomName });
+    const room = await RoomModel.findOne({name:roomName})
+    if (!room){
+      const newRoom = await new RoomModel({ name: roomName });
 
     const savedRoom = await newRoom.save();
     if (savedRoom._id) return savedRoom.name;
+    }else{
+      return room.name;
+    }
+    
   } catch (error) {
     console.log(error);
   }
 };
 const getUsersInRoom = async (roomName) => {
   try {
+    console.log({roomName})
     const room = await RoomModel.findOne({ name: roomName });
 
     return room.members;
@@ -62,9 +68,9 @@ const getUserBySocket = async (roomName, socketId) => {
 const removeUserFromRoom = async (socketId, roomName) => {
   try {
     const room = await RoomModel.findOne({ name: roomName })
-
+    console.log(socketId)
     const username = room.members.find(member => member.socketId === socketId)
-
+       
     await RoomModel.findOneAndUpdate(
       { name: roomName },
       { $pull: { members: { socketId } } }

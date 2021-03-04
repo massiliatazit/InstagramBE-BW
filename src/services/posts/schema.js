@@ -21,7 +21,7 @@ const PostSchema = new Schema(
       },
     ],
     tags: [{ type: Schema.Types.ObjectId, ref: "Users", required: true }],
-    images: { type: String, required: true },
+    images: { type: String, required: true, default: "https://via.placeholder.com/500" },
   },
   { timesstamps: true }
 );

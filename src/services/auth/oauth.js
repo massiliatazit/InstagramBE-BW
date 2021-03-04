@@ -15,7 +15,7 @@ passport.use(
     async (request, accessToken, refreshToken, profile, next) => {
       const newUser = {
         facebookId: profile.id,
-        name: profile.name.givenName,
+        firstname: profile.name.givenName,
         surname: profile.name.familyName,
         username: profile.displayName || profile.name.givenName + profile.name.familyName,
         email: profile.emails[0].value || "",

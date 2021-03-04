@@ -3,6 +3,7 @@ const express = require("express");
 const UserSchema = require("./schema");
 
 const Notification = require("../notifications/schema");
+const StoriesModel = require("../stories/schema");
 
 const usersRouter = express.Router();
 
@@ -188,24 +189,26 @@ usersRouter.get("/me", authorize, async (req, res, next) => {
       const userObject = req.user.toObject();
       const followers = req.user.followers.length;
       const following = req.user.following.length;
-      const queryTagged = req.user.saved.map((_id) => {
+      const queryTagged = req.user.tagged.map((_id) => {
         return { _id };
       });
       const querySaved = req.user.saved.map((_id) => {
         return { _id };
       });
-      const saved = await PostModel.find({ $or: [...querySaved] }).populate(
+
+      const saved = await PostModel.find({ $or: [...querySaved, { _id: null }] }).populate(
         "users",
         "-password -refreshTokens -email -followers -following -saved -puts -tagged",
         "tags",
         "-password -refreshTokens -email -followers -following -saved -puts -tagged"
       );
-      const tagged = await PostModel.find({ $or: [...queryTagged] }).populate(
+      const tagged = await PostModel.find({ $or: [...queryTagged, { _id: null }] }).populate(
         "users",
         "-password -refreshTokens -email -followers -following -saved -puts -tagged",
         "tags",
         "-password -refreshTokens -email -followers -following -saved -puts -tagged"
       );
+      const stories = await StoriesModel.find({ user: req.user._id }).populate("users", "-password -refreshTokens -email -followers -following -saved -puts -tagged");
       const posts = await PostModel.find({ user: req.user._id }).populate(
         "users",
         "-password -refreshTokens -email -followers -following -saved -puts -tagged",
@@ -219,7 +222,7 @@ usersRouter.get("/me", authorize, async (req, res, next) => {
       delete userObject.password;
       delete userObject.__v;
 
-      res.send({ ...userObject, saved, tagged, followers, following, numPosts, posts });
+      res.send({ ...userObject, saved, tagged, followers, stories, following, numPosts, posts });
     } else {
       const error = new Error();
       error.httpStatusCode = 404;

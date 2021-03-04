@@ -8,16 +8,22 @@ const Comment = require("./schema");
 const route = express.Router();
 
 const q2m = require("query-to-mongo");
+const PostModel = require("../posts/schema");
 
 route.post("/:post", authorize, async (req, res, next) => {
   try {
     //when posting a comment get the post and add notification to the post owner
     const newComment = new Comment({ ...req.body, post: req.params.post, user: req.user._id });
     const { _id } = await newComment.save();
-    const comment = await Comment.findById(_id).populate("user", "-password -refreshTokens -email -followers -following -saved -puts -tagged -posts").populate("post");
-    const notification = new Notification({ from: req.user._id, to: comment.post.user, post: req.params.post, action: "left a comment" });
+    const post = await PostModel.findByIdAndUpdate(req.params.post, { $push: { comments: _id } }, { runValidators: true, new: true }).populate(
+      "user",
+      "-password -refreshTokens -email -followers -following -saved -puts -tagged -posts"
+    );
+
+    const notification = new Notification({ from: req.user._id, to: post.user._id, post: req.params.post, action: "left a comment" });
     await notification.save();
-    res.status(201).send(comment);
+
+    res.status(201).send(post);
   } catch (error) {
     next(error);
   }

@@ -23,7 +23,7 @@ postRouter.post("/", authorize, async (req, res, next) => {
   try {
     const newPost = new PostModel({ ...req.body, user: req.user._id });
     const savedPost = await newPost.save();
-    if (req.body.tags.length > 0) {
+    if (req.body.tags) {
       let notification;
       req.body.tags.forEach(async (userID) => {
         //create notification for each user
@@ -43,7 +43,6 @@ postRouter.post("/", authorize, async (req, res, next) => {
     }
     res.status(201).send({ post: savedPost.populate("user", "-password -refreshTokens -email -followers -following -saved -puts -tagged -posts"), ok: true });
   } catch (error) {
-    res.send("Something is going wrong");
     next(error);
   }
 });
@@ -162,10 +161,11 @@ postRouter.put("/:id", authorize, async function (req, res, next) {
 });
 postRouter.put("/:id/picture", authorize, cloudinaryMulter.single("image"), async (req, res, next) => {
   try {
-    const updatedPost = await PostModel.findOneAndUpdate({ _id: req.params.id, user: req.user._id }, { image: req.file.path }, { runValidators: true, new: true })
+    const updatedPost = await PostModel.findOneAndUpdate({ _id: req.params.id, user: req.user._id }, { images: req.file.path }, { runValidators: true, new: true })
       .populate("comments.user", "-password -refreshTokens -email -followers -following -saved -puts -tagged -posts")
       .populate("tags", "-password -refreshTokens -email -followers -following -saved -puts -tagged -posts")
       .populate("user", "-password -refreshTokens -email -followers -following -saved -puts -tagged -posts");
+
     res.send(updatedPost);
   } catch (error) {
     next(error);

@@ -6,11 +6,13 @@ const PostSchema = new Schema(
       type: String,
       required: true,
     },
+    username: { type: String, required: true },
     user: {
       type: Schema.Types.ObjectId,
       ref: "Users",
       required: true,
     },
+    comments: [{ type: Schema.Types.ObjectId, ref: "Comment", required: true }],
     likes: [
       {
         type: Schema.Types.ObjectId,
@@ -19,7 +21,7 @@ const PostSchema = new Schema(
       },
     ],
     tags: [{ type: Schema.Types.ObjectId, ref: "Users", required: true }],
-    images: { type: String, default: "https://via.placeholder.com/500", required: true },
+    images: { type: String, required: true },
   },
   { timesstamps: true }
 );

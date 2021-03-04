@@ -6,12 +6,12 @@ const UserSchema = new Schema(
   {
     name: {
       type: String,
-      required: true,
     },
     surname: {
       type: String,
       required: true,
     },
+    firstname: { type: String, required: true },
     username: {
       type: String,
       unique: true,
@@ -28,8 +28,8 @@ const UserSchema = new Schema(
     password: {
       type: String,
     },
+    profileType: { default: "Personal", enum: ["Personal", "Business", "Creator"], type: String },
     tagged: [{ type: Schema.Types.ObjectId, ref: "Posts", required: true }],
-    posts: [{ type: Schema.Types.ObjectId, ref: "Posts", required: true }],
     saved: [{ type: Schema.Types.ObjectId, ref: "Posts", required: true }],
     followers: [{ type: Schema.Types.ObjectId, ref: "Users", required: true }],
     following: [{ type: Schema.Types.ObjectId, ref: "Users", required: true }],

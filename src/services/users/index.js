@@ -19,6 +19,7 @@ const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
 const multer = require("multer");
+const PostModel = require("../posts/schema");
 
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
@@ -44,7 +45,7 @@ usersRouter.get("/facebookRedirect", passport.authenticate("facebook"), async (r
       path: "/users/refreshToken",
     });
  */
-    res.status(200).redirect(`${process.env.FE_URL}/home?token=${req.user.tokens.token}&refreshToken=${req.user.tokens.refreshToken}`);
+    res.status(200).redirect(`${process.env.FE_URL}/profile?token=${req.user.tokens.token}&refreshToken=${req.user.tokens.refreshToken}`);
   } catch (error) {
     next(error);
   }
@@ -183,17 +184,42 @@ usersRouter.get("/suggested", authorize, async (req, res, next) => {
 usersRouter.get("/me", authorize, async (req, res, next) => {
   try {
     if (req.user) {
-      req.user.populate("posts", "tagged");
+      req.user;
       const userObject = req.user.toObject();
       const followers = req.user.followers.length;
       const following = req.user.following.length;
-      const numPosts = req.user.posts.length;
-
+      const queryTagged = req.user.saved.map((_id) => {
+        return { _id };
+      });
+      const querySaved = req.user.saved.map((_id) => {
+        return { _id };
+      });
+      const saved = await PostModel.find({ $or: [...querySaved] }).populate(
+        "users",
+        "-password -refreshTokens -email -followers -following -saved -puts -tagged",
+        "tags",
+        "-password -refreshTokens -email -followers -following -saved -puts -tagged"
+      );
+      const tagged = await PostModel.find({ $or: [...queryTagged] }).populate(
+        "users",
+        "-password -refreshTokens -email -followers -following -saved -puts -tagged",
+        "tags",
+        "-password -refreshTokens -email -followers -following -saved -puts -tagged"
+      );
+      const posts = await PostModel.find({ user: req.user._id }).populate(
+        "users",
+        "-password -refreshTokens -email -followers -following -saved -puts -tagged",
+        "tags",
+        "-password -refreshTokens -email -followers -following -saved -puts -tagged"
+      );
+      const numPosts = posts.length;
       delete userObject.refreshTokens;
       delete userObject.followers;
       delete userObject.following;
+      delete userObject.password;
+      delete userObject.__v;
 
-      res.send({ user: userObject, followers, following, numPosts });
+      res.send({ ...userObject, saved, tagged, followers, following, numPosts, posts });
     } else {
       const error = new Error();
       error.httpStatusCode = 404;
@@ -249,27 +275,30 @@ usersRouter.post("/me/follow/:username", authorize, async (req, res, next) => {
 usersRouter.get("/:username", authorize, async (req, res, next) => {
   try {
     if (req.user) {
-      const user = await UserSchema.findByUserName(req.params.username)
-        .populate("posts", "tagged")
-        .populate("posts.user", "-password -refreshTokens -email -followers -following -saved -posts -tagged")
-        .populate("tagged.user", "-password -refreshTokens -email -followers -following -saved -posts -tagged");
-      if (user) {
-        const follow = req.user.following.includes(user._id);
-        if (user.private) {
-          if (follow) {
-            res.send(user);
+      const checkUser = await UserSchema.countDocuments({ username: req.params.username });
+      if (checkUser.length > 0) {
+        const user = await UserSchema.findByUserName(req.params.username)
+          .populate("posts", "tagged")
+          .populate("posts.user", "-password -refreshTokens -email -followers -following -saved -posts -tagged")
+          .populate("tagged.user", "-password -refreshTokens -email -followers -following -saved -posts -tagged");
+        if (user) {
+          const follow = req.user.following.includes(user._id);
+          if (user.private) {
+            if (follow) {
+              res.send(user);
+            } else {
+              delete user.posts;
+              delete user.tagged;
+              res.send({ ...user });
+            }
           } else {
-            delete user.posts;
-            delete user.tagged;
-            res.send({ ...user });
+            res.send(user);
           }
         } else {
-          res.send(user);
+          const error = new Error("User not found");
+          error.httpStatusCode = 404;
+          next(error);
         }
-      } else {
-        const error = new Error("User not found");
-        error.httpStatusCode = 404;
-        next(error);
       }
     } else {
       const error = new Error();
@@ -405,19 +434,21 @@ usersRouter.delete("/me", authorize, async (req, res, next) => {
 
 usersRouter.post("/saved/:id", authorize, async (req, res, next) => {
   try {
-    await UserSchema.findOneAndUpdate(
-      { _id: req.user._id },
-      {
-        $pull: { saved: req.params.id },
-      },
-      {
-        new: true,
-        useFindAndModify: false,
-      }
-    );
-    const modifiedUser = req.query.add
-      ? await UserSchema.findOneAndUpdate(
-          { _id: req.user._id },
+    const post = await UserSchema.findOne({ _id: req.user._id, saved: req.params.id });
+
+    const modifiedUser = post
+      ? await UserSchema.findByIdAndUpdate(
+          req.user.id,
+          {
+            $pull: { saved: req.params.id },
+          },
+          {
+            new: true,
+            useFindAndModify: false,
+          }
+        )
+      : await UserSchema.findByIdAndUpdate(
+          req.user.id,
           {
             $push: { saved: req.params.id },
           },
@@ -425,8 +456,8 @@ usersRouter.post("/saved/:id", authorize, async (req, res, next) => {
             new: true,
             useFindAndModify: false,
           }
-        )
-      : await UserSchema.findOne({ _id: req.user._id });
+        );
+
     res.status(201).send(modifiedUser);
   } catch (error) {
     next(error);

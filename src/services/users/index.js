@@ -278,30 +278,38 @@ usersRouter.post("/me/follow/:username", authorize, async (req, res, next) => {
 usersRouter.get("/:username", authorize, async (req, res, next) => {
   try {
     if (req.user) {
-      const checkUser = await UserSchema.countDocuments({ username: req.params.username });
-      if (checkUser.length > 0) {
-        const user = await UserSchema.findByUserName(req.params.username)
-          .populate("posts", "tagged")
-          .populate("posts.user", "-password -refreshTokens -email -followers -following -saved -posts -tagged")
-          .populate("tagged.user", "-password -refreshTokens -email -followers -following -saved -posts -tagged");
-        if (user) {
-          const follow = req.user.following.includes(user._id);
-          if (user.private) {
-            if (follow) {
-              res.send(user);
-            } else {
-              delete user.posts;
-              delete user.tagged;
-              res.send({ ...user });
-            }
+      const userData = await UserSchema.findOne({ username: req.params.username }).populate("tagged", "tagged.user");
+      const stories = await StoriesModel.find({ user: userData._id }).populate("users", "-password -refreshTokens -email -followers -following -saved -puts -tagged");
+      const posts = await PostModel.find({ user: userData._id }).populate(
+        "users",
+        "-password -refreshTokens -email -followers -following -saved -puts -tagged",
+        "tags",
+        "-password -refreshTokens -email -followers -following -saved -puts -tagged"
+      );
+      const user = { ...userData.toObject(), stories, posts };
+      delete user.refreshTokens;
+      delete user.facebookId;
+      delete user.__v;
+      delete user.saved;
+      delete user.password;
+      if (user) {
+        const follow = req.user.following.includes(user._id);
+        if (user.private) {
+          if (follow) {
+            res.send(user);
           } else {
+            delete user.posts;
+            delete user.stories;
+            delete user.tagged;
             res.send(user);
           }
         } else {
-          const error = new Error("User not found");
-          error.httpStatusCode = 404;
-          next(error);
+          res.send(user);
         }
+      } else {
+        const error = new Error("User not found");
+        error.httpStatusCode = 404;
+        next(error);
       }
     } else {
       const error = new Error();

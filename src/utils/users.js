@@ -68,9 +68,9 @@ const getUserBySocket = async (roomName, socketId) => {
 const removeUserFromRoom = async (socketId, roomName) => {
   try {
     const room = await RoomModel.findOne({ name: roomName })
-
+    console.log(socketId)
     const username = room.members.find(member => member.socketId === socketId)
-
+       
     await RoomModel.findOneAndUpdate(
       { name: roomName },
       { $pull: { members: { socketId } } }

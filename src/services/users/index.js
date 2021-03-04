@@ -251,15 +251,14 @@ usersRouter.post("/me/follow/:username", authorize, async (req, res, next) => {
             //if user is private we sent notification but we dont follow
             const notification = new Notification({ from: req.user._id, to: user._id, action: "asked to follow you" });
             await notification.save();
-            res.send(201).send(req.user);
+            res.send(201).send({ ok: true, message: "Follow Requested" });
           }
         }
         await req.user.save();
         await user.save();
-        const updatedUser = await UserSchema.findByUserName(user.username);
         const notification = new Notification({ from: req.user._id, to: user._id, action: "started following you" });
         await notification.save();
-        res.status(201).send(updatedUser);
+        res.status(201).send({ ok: true });
       } else {
         const error = new Error("User not found");
         error.httpStatusCode = 404;
@@ -292,19 +291,22 @@ usersRouter.get("/:username", authorize, async (req, res, next) => {
       delete user.__v;
       delete user.saved;
       delete user.password;
+      user.numPosts = posts.length;
+      user.followers = user.followers.length;
+      user.following = user.following.length;
       if (user) {
         const follow = req.user.following.includes(user._id);
         if (user.private) {
           if (follow) {
-            res.send(user);
+            res.send({ ...user, follow });
           } else {
             delete user.posts;
             delete user.stories;
             delete user.tagged;
-            res.send(user);
+            res.send({ ...user, follow });
           }
         } else {
-          res.send(user);
+          res.send({ ...user, follow });
         }
       } else {
         const error = new Error("User not found");

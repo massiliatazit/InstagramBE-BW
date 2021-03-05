@@ -150,8 +150,8 @@ usersRouter.post("/refreshToken", async (req, res, next) => {
 usersRouter.get("/", async (req, res, next) => {
   try {
     const query = q2m(req.query);
-    const total = await UserSchema.countDocuments(req.query.search && { $text: { $search: req.query.search } });
-    const users = await UserSchema.find(req.query.search && { $text: { $search: req.query.search } })
+    const total = await UserSchema.countDocuments(req.query.search && { $or: [{ $text: { $search: req.query.search } }, { username: { $regex: `.*${req.query.search}.*` } }] });
+    const users = await UserSchema.find(req.query.search && { $or: [{ $text: { $search: req.query.search } }, { username: { $regex: `.*${req.query.search}.*` } }] })
       .sort({ createdAt: -1 })
       .skip(query.options.skip)
       .limit(query.options.limit)
@@ -186,6 +186,7 @@ usersRouter.get("/me", authorize, async (req, res, next) => {
   try {
     if (req.user) {
       req.user;
+      const notifications = await Notification.countDocuments({ to: req.user._id, viewed: false });
       const userObject = req.user.toObject();
       const followers = req.user.followers.length;
       const following = req.user.following.length;
@@ -222,7 +223,7 @@ usersRouter.get("/me", authorize, async (req, res, next) => {
       delete userObject.password;
       delete userObject.__v;
 
-      res.send({ ...userObject, saved, tagged, followers, stories, following, numPosts, posts });
+      res.send({ ...userObject, saved, tagged, followers, stories, following, numPosts, posts, notifications });
     } else {
       const error = new Error();
       error.httpStatusCode = 404;
@@ -330,7 +331,7 @@ usersRouter.get("/:username/followers", authorize, async (req, res, next) => {
       const user = await UserSchema.findOne({ username: req.params.username }).populate("followers", "-password -refreshTokens -email -followers -following -saved -posts -tagged");
       if (user) {
         if (user.private) {
-          if (req.user.following.includes(user._id) || user._id === req.user._id) {
+          if (req.user.following.includes(user._id) || user.username === req.user.username) {
             res.send(user.followers);
           } else {
             const error = new Error();
